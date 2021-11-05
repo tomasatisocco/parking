@@ -37,6 +37,53 @@ typedef union{
 #define APERTURASALIDA 14
 #define CIERRESALIDA 15
 
+void ChequearDebounce(int botonActual);
+
+uint8_t ultimoBoton;
+unsigned long time, ultimoDebounce;
+
+void LeerBotones(){
+  if(digitalRead(BOTONM) || digitalRead(BOTONR) || digitalRead(BOTONP)){
+    if (digitalRead(BOTONP)){
+      ChequearDebounce(BOTONP);
+    }
+    if (digitalRead(BOTONM)) {
+      ChequearDebounce(BOTONM);
+    }
+    if (digitalRead(BOTONR)){
+      ChequearDebounce(BOTONR);
+    }
+  } else {
+    ultimoBoton = 0x00;
+    ultimoDebounce = millis();
+  }
+}
+
+void ChequearDebounce(int botonActual){
+  time = millis();
+  if ((time - ultimoDebounce) >= 30){
+    if(botonActual ^ ultimoBoton){
+      ultimoBoton = botonActual;
+      switch (botonActual) {
+        case BOTONP:
+          PararEstacionamiento();
+          break;
+        case BOTONM:
+          HabilitarEstacionamiento();
+          break;
+        case BOTONR:
+          ResetarEstacionamiento();
+          break;
+        default:
+          break;
+      }
+      ultimoDebounce = millis();
+    } else {
+      ultimoDebounce = millis();
+    }
+  }
+}
+
 void setup() {
   pinMode(SENSORENTRADA1, INPUT);
   pinMode(SENSORENTRADA2, INPUT);
@@ -56,5 +103,5 @@ void setup() {
 }
 
 void loop() {
-  // put your main code here, to run repeatedly:
+  LeerBotones();
 }
