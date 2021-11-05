@@ -41,10 +41,20 @@ typedef union{
 
 #define ESTACIONAMIENTOLLENO flag1.bit.b0
 #define ESTACIONAMIENTOHABILITADO flag1.bit.b1
-#define ABRIENDO flag1.bit.b2
-#define CERRANDO flag1.bit.b3
+#define ABRIENDOENTRADA flag1.bit.b2
+#define CERRANDOENTRADA flag1.bit.b3
+#define ABRINEDOSALIDA flag1.bit.b4
+#define CERRANDOSALIDA flag1.bit.b5
 
-uint8_t cantidadVehiculos,ultimoBoton;
+//Definincion de los distintos estados de Entrada
+
+#define ESPERANDO 1
+#define VEHICULODETECTADO 2
+#define BARRERAABIERTA 3
+#define VEHICULOENTRANDO 4
+#define VEHICULOINGRESADO 5
+
+uint8_t cantidadVehiculos,ultimoBoton, estadoEntrada, estadoSalida;
 unsigned long time, ultimoDebounce, accionamientoMotorEntrada, accionamientoMotorSalida;
 
 _flag flag1;
@@ -53,11 +63,10 @@ void ChequearDebounce(int botonActual);
 void PararEstacionamiento();
 void HabilitarEstacionamiento();
 void ResetarEstacionamiento();
-
-void CambiarLuz(){
-  digitalWrite(LUZROJA, ESTACIONAMIENTOLLENO);
-  digitalWrite(LUZVERDE, !ESTACIONAMIENTOLLENO);
-}
+void AbrirBarreraEntrada();
+void CerrarBarreraEntrada();
+void AbrirBarreraSalida();
+void CerrarBarreraSalida();
 
 void LeerBotones(){
   if(digitalRead(BOTONM) || digitalRead(BOTONR) || digitalRead(BOTONP)){
@@ -114,25 +123,26 @@ void ResetearEstaccionamineto(){
   ESTACIONAMIENTOHABILITADO = 0x01;
 }
 
-void AbrirBarrera(uint8_t barrera, unsigned long ultimoAccionamiento){
+void AbrirBarreraEntrada(){
   time = millis();
-  if (!ABRIENDO){
-    digitalWrite(barrera, HIGH);
-    ABRIENDO = 0x01;
-    ultimoAccionamiento = millis();
-  } else if (((time - ultimoAccionamiento) >= 3000) && ABRIENDO){
-      digitalWrite(barrera, LOW);
-      ABRIENDO = 0x00;
+  if (!ABRIENDOENTRADA){
+    digitalWrite(APERTURAENTRADA, HIGH);
+    ABRIENDOENTRADA = 0x01;
+    accionamientoMotorEntrada = millis();
+  } else if (((time - accionamientoMotorEntrada) >= 3000) && ABRIENDOENTRADA){
+      digitalWrite(APERTURAENTRADA, LOW);
+      ABRIENDOENTRADA = 0x00;
     }
 }
-void CerrarBarrera(uint8_t barrera, unsigned long ultimoAccionamiento){
+void CerrarBarreraEntrada(){
   time = millis();
-  if(!CERRANDO){
-    digitalWrite(barrera, HIGH);
-    CERRANDO = 0x01;
-    ultimoAccionamiento = millis();
-  } else if (((time - ultimoAccionamiento) >= 3000) && CERRANDO){
-    digitalWrite(barrera, HIGH);
+  if(!CERRANDOENTRADA){
+    digitalWrite(CIERREENTRADA, HIGH);
+    CERRANDOENTRADA = 0x01;
+    accionamientoMotorEntrada = millis();
+  } else if (((time - accionamientoMotorEntrada) >= 3000) && CERRANDOENTRADA){
+    digitalWrite(CIERREENTRADA, LOW);
+    CERRANDOENTRADA = 0x00;
   }
 }
 
@@ -156,4 +166,43 @@ void setup() {
 
 void loop() {
   LeerBotones();
+  if (ESTACIONAMIENTOHABILITADO){
+    if(!ESTACIONAMIENTOLLENO){
+      switch (estadoEntrada) {
+        case ESPERANDO:
+          if (digitalRead(SENSORENTRADA1)){
+            estadoEntrada = VEHICULODETECTADO;
+          }
+        break;
+        case VEHICULODETECTADO:
+          AbrirBarreraEntrada();
+          if (!ABRIENDOENTRADA){
+            estadoEntrada = BARRERAABIERTA;
+          }
+        break;
+        case BARRERAABIERTA:
+          if (digitalRead(SENSORENTRADA2)){
+            estadoEntrada = VEHICULOENTRANDO;
+          }
+        break;
+        case VEHICULOENTRANDO:
+          if (!digitalRead(SENSORENTRADA2)){
+            estadoEntrada = VEHICULOINGRESADO;
+          }
+        break;
+        case VEHICULOINGRESADO:
+          CerrarBarreraEntrada();
+          if (++cantidadVehiculos >= 10){
+            ESTACIONAMIENTOHABILITADO = 0x00;
+          }
+          if(!CERRANDOENTRADA){
+            estadoEntrada = ESPERANDO;
+          }
+        break;
+      }
+    } else {
+      digitalWrite(LUZROJA, HIGH);
+      digitalWrite(LUZVERDE, LOW);
+    }
+  }
 }
