@@ -42,6 +42,7 @@ typedef union{
 #define ESTACIONAMIENTOLLENO flag1.bit.b0
 #define ESTACIONAMIENTOHABILITADO flag1.bit.b1
 #define ABRIENDO flag1.bit.b2
+#define CERRANDO flag1.bit.b3
 
 uint8_t cantidadVehiculos,ultimoBoton;
 unsigned long time, ultimoDebounce, accionamientoMotorEntrada, accionamientoMotorSalida;
@@ -111,6 +112,28 @@ void HabilitarEstacionamiento(){
 void ResetearEstaccionamineto(){
   cantidadVehiculos = 10;
   ESTACIONAMIENTOHABILITADO = 0x01;
+}
+
+void AbrirBarrera(uint8_t barrera, unsigned long ultimoAccionamiento){
+  time = millis();
+  if (!ABRIENDO){
+    digitalWrite(barrera, HIGH);
+    ABRIENDO = 0x01;
+    ultimoAccionamiento = millis();
+  } else if (((time - ultimoAccionamiento) >= 3000) && ABRIENDO){
+      digitalWrite(barrera, LOW);
+      ABRIENDO = 0x00;
+    }
+}
+void CerrarBarrera(uint8_t barrera, unsigned long ultimoAccionamiento){
+  time = millis();
+  if(!CERRANDO){
+    digitalWrite(barrera, HIGH);
+    CERRANDO = 0x01;
+    ultimoAccionamiento = millis();
+  } else if (((time - ultimoAccionamiento) >= 3000) && CERRANDO){
+    digitalWrite(barrera, HIGH);
+  }
 }
 
 void setup() {
