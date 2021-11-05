@@ -37,10 +37,26 @@ typedef union{
 #define APERTURASALIDA 14
 #define CIERRESALIDA 15
 
-void ChequearDebounce(int botonActual);
+//Definicion de Banderas para los distintos Estados
 
-uint8_t ultimoBoton;
-unsigned long time, ultimoDebounce;
+#define ESTACIONAMIENTOLLENO flag1.bit.b0
+#define ESTACIONAMIENTOHABILITADO flag1.bit.b1
+#define ABRIENDO flag1.bit.b2
+
+uint8_t cantidadVehiculos,ultimoBoton;
+unsigned long time, ultimoDebounce, accionamientoMotorEntrada, accionamientoMotorSalida;
+
+_flag flag1;
+
+void ChequearDebounce(int botonActual);
+void PararEstacionamiento();
+void HabilitarEstacionamiento();
+void ResetarEstacionamiento();
+
+void CambiarLuz(){
+  digitalWrite(LUZROJA, ESTACIONAMIENTOLLENO);
+  digitalWrite(LUZVERDE, !ESTACIONAMIENTOLLENO);
+}
 
 void LeerBotones(){
   if(digitalRead(BOTONM) || digitalRead(BOTONR) || digitalRead(BOTONP)){
@@ -82,6 +98,19 @@ void ChequearDebounce(int botonActual){
       ultimoDebounce = millis();
     }
   }
+}
+
+void PararEstacionamiento(){
+  ESTACIONAMIENTOHABILITADO = 0x00;
+}
+
+void HabilitarEstacionamiento(){
+  ESTACIONAMIENTOHABILITADO = 0x01;
+}
+
+void ResetearEstaccionamineto(){
+  cantidadVehiculos = 10;
+  ESTACIONAMIENTOHABILITADO = 0x01;
 }
 
 void setup() {
