@@ -43,7 +43,7 @@ typedef union{
 #define ESTACIONAMIENTOHABILITADO flag1.bit.b1
 #define ABRIENDOENTRADA flag1.bit.b2
 #define CERRANDOENTRADA flag1.bit.b3
-#define ABRINEDOSALIDA flag1.bit.b4
+#define ABRIENDOSALIDA flag1.bit.b4
 #define CERRANDOSALIDA flag1.bit.b5
 
 //Definincion de los distintos estados de Entrada
@@ -129,20 +129,45 @@ void AbrirBarreraEntrada(){
     digitalWrite(APERTURAENTRADA, HIGH);
     ABRIENDOENTRADA = 0x01;
     accionamientoMotorEntrada = millis();
-  } else if (((time - accionamientoMotorEntrada) >= 3000) && ABRIENDOENTRADA){
+  } else if ((time - accionamientoMotorEntrada) >= 3000){
       digitalWrite(APERTURAENTRADA, LOW);
       ABRIENDOENTRADA = 0x00;
     }
 }
+
 void CerrarBarreraEntrada(){
   time = millis();
   if(!CERRANDOENTRADA){
     digitalWrite(CIERREENTRADA, HIGH);
     CERRANDOENTRADA = 0x01;
     accionamientoMotorEntrada = millis();
-  } else if (((time - accionamientoMotorEntrada) >= 3000) && CERRANDOENTRADA){
+  } else if ((time - accionamientoMotorEntrada) >= 3000){
     digitalWrite(CIERREENTRADA, LOW);
     CERRANDOENTRADA = 0x00;
+  }
+}
+
+void AbrirBarreraSalida(){
+  time = millis();
+  if (!ABRIENDOSALIDA){
+    digitalWrite(APERTURASALIDA, HIGH);
+    ABRIENDOSALIDA = 0x01;
+    accionamientoMotorSalida = millis();
+  } else if ((time - accionamientoMotorSalida) >= 3000){
+      digitalWrite(APERTURASALIDA, LOW);
+      ABRIENDOSALIDA = 0x00;
+    }
+}
+
+void CerrarBarreraSalida(){
+  time = millis();
+  if(!CERRANDOSALIDA){
+    digitalWrite(CIERRESALIDA, HIGH);
+    CERRANDOSALIDA = 0x01;
+    accionamientoMotorSalida = millis();
+  } else if ((time - accionamientoMotorSalida) >= 3000){
+    digitalWrite(CIERRESALIDA, LOW);
+    CERRANDOSALIDA = 0x00;
   }
 }
 
@@ -194,15 +219,48 @@ void loop() {
           CerrarBarreraEntrada();
           if (++cantidadVehiculos >= 10){
             ESTACIONAMIENTOHABILITADO = 0x00;
+            digitalWrite(LUZROJA, HIGH);
+            digitalWrite(LUZVERDE, LOW);
           }
           if(!CERRANDOENTRADA){
             estadoEntrada = ESPERANDO;
           }
         break;
       }
-    } else {
-      digitalWrite(LUZROJA, HIGH);
-      digitalWrite(LUZVERDE, LOW);
+    }
+    switch (estadoSalida) {
+      case ESPERANDO:
+        if (digitalRead(SENSORSALIDA1) && digitalRead(SENSORTARJETA)){
+          estadoSalida = VEHICULODETECTADO;
+        }
+      break;
+      case VEHICULODETECTADO:
+        AbrirBarreraSalida();
+        if (!ABRIENDOSALIDA){
+          estadoSalida = BARRERAABIERTA;
+        }
+      break;
+      case BARRERAABIERTA:
+        if (digitalRead(SENSORSALIDA2)){
+          estadoSalida = VEHICULOENTRANDO;
+        }
+      break;
+      case VEHICULOENTRANDO:
+        if (!digitalRead(SENSORSALIDA2)){
+          estadoSalida = VEHICULOINGRESADO;
+        }
+      break;
+      case VEHICULOINGRESADO:
+        CerrarBarreraEntrada();
+        if (++cantidadVehiculos <= 10){
+          ESTACIONAMIENTOHABILITADO = 0x01;
+          digitalWrite(LUZROJA, LOW);
+          digitalWrite(LUZVERDE, HIGH);
+        }
+        if(!CERRANDOENTRADA){
+          estadoSalida = ESPERANDO;
+        }
+      break;
     }
   }
 }
