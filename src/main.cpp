@@ -46,7 +46,9 @@ typedef union{
 #define ABRIENDOSALIDA flag1.bit.b4
 #define CERRANDOSALIDA flag1.bit.b5
 
-//Definincion de los distintos estados de Entrada
+//Definincion de los distintos estados de Entrada/Salida
+//Se utilizan los mismos nombres para ahorrar espacio pero en el caso de la Salida
+// VEHICULOENTRANDO y VEHICULOINGRESADO se deben interpretar como SALIENDO y SALIDO
 
 #define ESPERANDO 1
 #define VEHICULODETECTADO 2
@@ -54,10 +56,14 @@ typedef union{
 #define VEHICULOENTRANDO 4
 #define VEHICULOINGRESADO 5
 
+// Definicion de Variables
+
 uint8_t cantidadVehiculos,ultimoBoton, estadoEntrada, estadoSalida;
 unsigned long time, ultimoDebounce, accionamientoMotorEntrada, accionamientoMotorSalida;
 
 _flag flag1;
+
+//Prototipado de funciones
 
 void ChequearDebounce(int botonActual);
 void PararEstacionamiento();
@@ -67,6 +73,9 @@ void AbrirBarreraEntrada();
 void CerrarBarreraEntrada();
 void AbrirBarreraSalida();
 void CerrarBarreraSalida();
+
+//Esta serie de funciones es para salvar el efecto de debounce de los botones mecanicos
+// e implementar al logica ante cada boton presionado
 
 void LeerBotones(){
   if(digitalRead(BOTONM) || digitalRead(BOTONR) || digitalRead(BOTONP)){
@@ -112,16 +121,24 @@ void ChequearDebounce(int botonActual){
 
 void PararEstacionamiento(){
   ESTACIONAMIENTOHABILITADO = 0x00;
+  digitalWrite(LUZROJA, HIGH);
+  digitalWrite(LUZVERDE, LOW);
 }
 
 void HabilitarEstacionamiento(){
   ESTACIONAMIENTOHABILITADO = 0x01;
+  digitalWrite(LUZROJA, LOW);
+  digitalWrite(LUZVERDE, HIGH);
 }
 
 void ResetearEstaccionamineto(){
-  cantidadVehiculos = 10;
+  cantidadVehiculos = 0;
   ESTACIONAMIENTOHABILITADO = 0x01;
 }
+
+//Para abrir y cerrar las barreras se supone que el tiempo de activacion de los motores es de 3 segundos
+// para completar el recorrido, asi como que se utilizaran salidas distintas para poder invertir el sentido
+// de gito de los motores
 
 void AbrirBarreraEntrada(){
   time = millis();
@@ -187,10 +204,23 @@ void setup() {
   pinMode(CIERREENTRADA, OUTPUT);
   pinMode(APERTURASALIDA, OUTPUT);
   pinMode(CIERRESALIDA, OUTPUT);
+
+  // Cuando se inicia el micro se supone el estacionamiento vacio y deshabilitado
+  // hasta que se accione el boton. Los estados basicos de los sensores son ESPERANDO
+
+  ESTACIONAMIENTOHABILITADO = 0x00;
+  digitalWrite(LUZROJA, HIGH);
+  digitalWrite(LUZVERDE, LOW);
+  estadoEntrada = ESPERANDO;
+  estadoSalida = ESPERANDO;
+  cantidadVehiculos = 0;
 }
 
 void loop() {
+  // Todo el tiempo se esta chequeando si los botones son presionados o no
   LeerBotones();
+  //Los sensores de entrada solamente leen cuando el estacionamiento esta habilitado
+  // y tiene lugar. Los sensores solamente se leen si el estado actual de la entrada lo amerita.
   if (ESTACIONAMIENTOHABILITADO){
     if(!ESTACIONAMIENTOLLENO){
       switch (estadoEntrada) {
@@ -228,6 +258,8 @@ void loop() {
         break;
       }
     }
+    // Los sensores de salida son leidos siempre que el estacionamiento este habilitado,
+    // a diferencia de los sensores de entrada ya que los autos siempre salen.
     switch (estadoSalida) {
       case ESPERANDO:
         if (digitalRead(SENSORSALIDA1) && digitalRead(SENSORTARJETA)){
