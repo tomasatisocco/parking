@@ -29,13 +29,13 @@ typedef union{
 
 //Definicion Variables de Salida
 
-#define LUZROJA 10
-#define LUZVERDE 11
+#define LUZROJA 11
+#define LUZVERDE 10
 
-#define APERTURAENTRADA 12
-#define CIERREENTRADA 13
-#define APERTURASALIDA 14
-#define CIERRESALIDA 15
+#define APERTURAENTRADA A0
+#define CIERREENTRADA A1
+#define APERTURASALIDA A2
+#define CIERRESALIDA A3
 
 //Definicion de Banderas para los distintos Estados
 
@@ -55,6 +55,10 @@ typedef union{
 #define BARRERAABIERTA 3
 #define VEHICULOENTRANDO 4
 #define VEHICULOINGRESADO 5
+#define BARRERACERRADA 6
+
+#define TIEMPOACCION 1000
+#define CAPACIDADESTACIONAMIENTO 3
 
 // Definicion de Variables
 
@@ -68,7 +72,7 @@ _flag flag1;
 void ChequearDebounce(int botonActual);
 void PararEstacionamiento();
 void HabilitarEstacionamiento();
-void ResetarEstacionamiento();
+void ResetearEstacionamiento();
 void AbrirBarreraEntrada();
 void CerrarBarreraEntrada();
 void AbrirBarreraSalida();
@@ -107,7 +111,7 @@ void ChequearDebounce(int botonActual){
           HabilitarEstacionamiento();
           break;
         case BOTONR:
-          ResetarEstacionamiento();
+          ResetearEstacionamiento();
           break;
         default:
           break;
@@ -127,13 +131,18 @@ void PararEstacionamiento(){
 
 void HabilitarEstacionamiento(){
   ESTACIONAMIENTOHABILITADO = 0x01;
-  digitalWrite(LUZROJA, LOW);
-  digitalWrite(LUZVERDE, HIGH);
+  if(!ESTACIONAMIENTOLLENO){
+  	digitalWrite(LUZROJA, LOW);
+  	digitalWrite(LUZVERDE, HIGH);
+  }
 }
 
-void ResetearEstaccionamineto(){
+void ResetearEstacionamiento(){
   cantidadVehiculos = 0;
-  ESTACIONAMIENTOHABILITADO = 0x01;
+  ESTACIONAMIENTOHABILITADO = 0x00;
+  ESTACIONAMIENTOLLENO = 0;
+  digitalWrite(LUZROJA, HIGH);
+  digitalWrite(LUZVERDE, LOW);
 }
 
 //Para abrir y cerrar las barreras se supone que el tiempo de activacion de los motores es de 3 segundos
@@ -146,10 +155,12 @@ void AbrirBarreraEntrada(){
     digitalWrite(APERTURAENTRADA, HIGH);
     ABRIENDOENTRADA = 0x01;
     accionamientoMotorEntrada = millis();
-  } else if ((time - accionamientoMotorEntrada) >= 3000){
+  } else {
+    if ((time - accionamientoMotorEntrada) >= TIEMPOACCION){
       digitalWrite(APERTURAENTRADA, LOW);
       ABRIENDOENTRADA = 0x00;
     }
+  }
 }
 
 void CerrarBarreraEntrada(){
@@ -158,7 +169,7 @@ void CerrarBarreraEntrada(){
     digitalWrite(CIERREENTRADA, HIGH);
     CERRANDOENTRADA = 0x01;
     accionamientoMotorEntrada = millis();
-  } else if ((time - accionamientoMotorEntrada) >= 3000){
+  } else if ((time - accionamientoMotorEntrada) >= TIEMPOACCION){
     digitalWrite(CIERREENTRADA, LOW);
     CERRANDOENTRADA = 0x00;
   }
@@ -170,7 +181,7 @@ void AbrirBarreraSalida(){
     digitalWrite(APERTURASALIDA, HIGH);
     ABRIENDOSALIDA = 0x01;
     accionamientoMotorSalida = millis();
-  } else if ((time - accionamientoMotorSalida) >= 3000){
+  } else if ((time - accionamientoMotorSalida) >= TIEMPOACCION){
       digitalWrite(APERTURASALIDA, LOW);
       ABRIENDOSALIDA = 0x00;
     }
@@ -182,7 +193,7 @@ void CerrarBarreraSalida(){
     digitalWrite(CIERRESALIDA, HIGH);
     CERRANDOSALIDA = 0x01;
     accionamientoMotorSalida = millis();
-  } else if ((time - accionamientoMotorSalida) >= 3000){
+  } else if ((time - accionamientoMotorSalida) >= TIEMPOACCION){
     digitalWrite(CIERRESALIDA, LOW);
     CERRANDOSALIDA = 0x00;
   }
@@ -209,6 +220,7 @@ void setup() {
   // hasta que se accione el boton. Los estados basicos de los sensores son ESPERANDO
 
   ESTACIONAMIENTOHABILITADO = 0x00;
+  ESTACIONAMIENTOLLENO = 0x00;
   digitalWrite(LUZROJA, HIGH);
   digitalWrite(LUZVERDE, LOW);
   estadoEntrada = ESPERANDO;
@@ -247,22 +259,28 @@ void loop() {
         break;
         case VEHICULOINGRESADO:
           CerrarBarreraEntrada();
-          if (++cantidadVehiculos >= 10){
-            ESTACIONAMIENTOHABILITADO = 0x00;
+          if(!CERRANDOENTRADA){
+            estadoEntrada = BARRERACERRADA;
+          }
+        break;
+        case BARRERACERRADA:
+          cantidadVehiculos++;
+          if (cantidadVehiculos >= CAPACIDADESTACIONAMIENTO){
+            ESTACIONAMIENTOLLENO = 0x01;
             digitalWrite(LUZROJA, HIGH);
             digitalWrite(LUZVERDE, LOW);
           }
-          if(!CERRANDOENTRADA){
-            estadoEntrada = ESPERANDO;
-          }
+        estadoEntrada = ESPERANDO;
         break;
+        default:
+          estadoEntrada = ESPERANDO;
       }
     }
     // Los sensores de salida son leidos siempre que el estacionamiento este habilitado,
     // a diferencia de los sensores de entrada ya que los autos siempre salen.
     switch (estadoSalida) {
       case ESPERANDO:
-        if (digitalRead(SENSORSALIDA1) && digitalRead(SENSORTARJETA)){
+        if (digitalRead(SENSORSALIDA1) && digitalRead(SENSORTARJETA) && (cantidadVehiculos > 0)){
           estadoSalida = VEHICULODETECTADO;
         }
       break;
@@ -283,16 +301,23 @@ void loop() {
         }
       break;
       case VEHICULOINGRESADO:
-        CerrarBarreraEntrada();
-        if (++cantidadVehiculos <= 10){
-          ESTACIONAMIENTOHABILITADO = 0x01;
+        CerrarBarreraSalida();
+
+        if(!CERRANDOSALIDA){
+          estadoSalida = BARRERACERRADA;
+        }
+      break;
+      case BARRERACERRADA:
+      cantidadVehiculos--;
+      	if (cantidadVehiculos < CAPACIDADESTACIONAMIENTO){
+          ESTACIONAMIENTOLLENO = 0x00;
           digitalWrite(LUZROJA, LOW);
           digitalWrite(LUZVERDE, HIGH);
         }
-        if(!CERRANDOENTRADA){
-          estadoSalida = ESPERANDO;
-        }
+      estadoSalida = ESPERANDO;
       break;
+      default:
+        estadoSalida = ESPERANDO;
     }
   }
 }
