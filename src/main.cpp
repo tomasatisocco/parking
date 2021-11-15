@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <avr/eeprom.h>
 
 typedef union{
   struct{
@@ -66,6 +67,8 @@ uint8_t cantidadVehiculos,ultimoBoton, estadoEntrada, estadoSalida;
 unsigned long time, ultimoDebounce, accionamientoMotorEntrada, accionamientoMotorSalida;
 
 _flag flag1;
+
+__attribute__((section(".eeprom"))) uint8_t eepromCantVehiculos;
 
 //Prototipado de funciones
 
@@ -225,7 +228,7 @@ void setup() {
   digitalWrite(LUZVERDE, LOW);
   estadoEntrada = ESPERANDO;
   estadoSalida = ESPERANDO;
-  cantidadVehiculos = 0;
+  cantidadVehiculos = eeprom_read_byte(&eepromCantVehiculos);
 }
 
 void loop() {
@@ -270,6 +273,7 @@ void loop() {
             digitalWrite(LUZROJA, HIGH);
             digitalWrite(LUZVERDE, LOW);
           }
+        eeprom_write_byte(&eepromCantVehiculos, cantidadVehiculos);
         estadoEntrada = ESPERANDO;
         break;
         default:
@@ -302,7 +306,7 @@ void loop() {
       break;
       case VEHICULOINGRESADO:
         CerrarBarreraSalida();
-
+        
         if(!CERRANDOSALIDA){
           estadoSalida = BARRERACERRADA;
         }
@@ -315,6 +319,7 @@ void loop() {
           digitalWrite(LUZVERDE, HIGH);
         }
       estadoSalida = ESPERANDO;
+      eeprom_write_byte(&eepromCantVehiculos, cantidadVehiculos);
       break;
       default:
         estadoSalida = ESPERANDO;
